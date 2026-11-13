@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IDOC Eye Care Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a clinic tool. Thin top bar for role, language and network; patient screens sit in a phone-width column, staff screens use the full width. */
+:root{
+  --bg:#f2f4f1; --surface:#ffffff; --ink:#16201c; --muted:#5b6862; --line:#dce2dc;
+  --accent:#0d6b50; --accent-ink:#ffffff; --accent-soft:#e3f1ec;
+  --warn:#9a5b00; --warn-bg:#fcf1dd; --danger:#b42318; --danger-bg:#fcebe8; --ok:#1d6f3b; --ok-bg:#e5f3e9;
+  --display:"Archivo",system-ui,sans-serif; --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1513; --surface:#17201c; --ink:#e4ebe7; --muted:#97a69f; --line:#28332e;
+  --accent:#43b48c; --accent-ink:#06130e; --accent-soft:#163027;
+  --warn:#efb455; --warn-bg:#2b2110; --danger:#f17d70; --danger-bg:#2e1613; --ok:#6fcf91; --ok-bg:#122619; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f1513; --surface:#17201c; --ink:#e4ebe7; --muted:#97a69f; --line:#28332e;
+  --accent:#43b48c; --accent-ink:#06130e; --accent-soft:#163027;
+  --warn:#efb455; --warn-bg:#2b2110; --danger:#f17d70; --danger-bg:#2e1613; --ok:#6fcf91; --ok-bg:#122619; color-scheme:dark;}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--body);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:1.75rem;font-weight:800} h2{font-size:1.3rem;font-weight:700} h3{font-size:1.05rem;font-weight:700}
+p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.875rem}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between;padding:10px 20px}
+.brand{display:flex;gap:10px;align-items:center}
+.brand b{font-family:var(--display);font-weight:800;font-size:1.2rem;letter-spacing:.02em}
+.brand span{display:block;font-size:.78rem;color:var(--muted);line-height:1.1}
+.brand svg{color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;padding:2px;background:var(--bg)}
+.seg button{border:0;background:transparent;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:500;font-size:.9rem;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:.85rem;cursor:pointer;font-weight:500}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.chip.off .dot{background:var(--warn)}
+.chip.off{background:var(--warn-bg);border-color:transparent;color:var(--warn)}
+.demo{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:center;padding:7px 20px;font-size:.82rem;color:var(--muted);border-bottom:1px solid var(--line)}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+
+/* layout */
+main{padding:24px 16px 80px}
+.narrow{max-width:560px;margin:0 auto;display:grid;gap:16px}
+.wide{max-width:1080px;margin:0 auto;display:grid;gap:20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;display:grid;gap:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;align-items:start}
+.stack{display:grid;gap:10px}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 16px;font-weight:600;cursor:pointer;text-decoration:none}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.ghost{border-color:transparent;background:transparent;padding-left:0;color:var(--muted)}
+.btn.full{width:100%}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.giant{width:100%;border:0;border-radius:18px;background:var(--accent);color:var(--accent-ink);padding:34px 20px;cursor:pointer;display:grid;gap:6px;justify-items:center;text-align:center}
+.giant svg{margin-bottom:6px}
+.giant b{font-family:var(--display);font-size:1.7rem;font-weight:800}
+.giant span{opacity:.85}
+
+/* forms */
+label.f{display:grid;gap:6px;font-weight:600;font-size:.92rem}
+input[type=text],input[type=tel],input[type=number],input[type=date],select,textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--bg);font-weight:400}
+textarea{min-height:80px;resize:vertical}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{position:relative}
+.opt input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.opt span{display:inline-block;border:1px solid var(--line);border-radius:8px;padding:8px 14px;background:var(--bg);font-weight:500}
+.opt input:checked+span{border-color:var(--accent);background:var(--accent-soft);color:var(--ink);box-shadow:inset 0 0 0 1px var(--accent)}
+.opt input:focus-visible+span{outline:3px solid var(--accent);outline-offset:2px}
+.check{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);cursor:pointer}
+.check input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none}
+.check.urg{border-left:4px solid var(--danger)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{border:0;background:none;padding:10px 14px;cursor:pointer;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-pressed="true"]{color:var(--ink);border-color:var(--accent)}
+
+/* status */
+.pill{display:inline-block;font-size:.78rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.pill.warn{background:var(--warn-bg);color:var(--warn);border-color:transparent}
+.pill.danger{background:var(--danger-bg);color:var(--danger);border-color:transparent}
+.pill.acc{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.verdict{border-radius:12px;padding:20px;display:grid;gap:8px;border-left:6px solid}
+.verdict.pass{background:var(--ok-bg);border-color:var(--ok)}
+.verdict.refer{background:var(--warn-bg);border-color:var(--warn)}
+.verdict.urgent{background:var(--danger-bg);border-color:var(--danger)}
+.verdict h2{font-size:1.45rem}
+.list{display:grid;gap:0}
+.item{display:grid;gap:4px;padding:14px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0;padding-top:0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 16px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.stat b{display:block;font-family:var(--display);font-size:2rem;font-weight:800;line-height:1.1}
+.stat span{color:var(--muted);font-size:.88rem}
+.bar{height:8px;background:var(--bg);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.bar i{display:block;height:100%;background:var(--accent)}
+.notice{background:var(--accent-soft);border-radius:10px;padding:12px 14px;font-size:.92rem}
+.notice.warn{background:var(--warn-bg);color:var(--warn)}
+ul.plain{margin:0;padding-left:20px;display:grid;gap:6px}
+.thumb{width:120px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.preview{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+
+/* eye test */
+.chart{background:#fff;color:#000;border-radius:12px;border:1px solid var(--line);min-height:240px;display:grid;place-items:center;padding:24px}
+.chart svg{fill:#000;transition:transform .15s}
+.dirs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:320px;margin:0 auto;width:100%}
+.dirs .btn{padding:14px 8px}
+.progress{display:flex;gap:4px}
+.progress i{flex:1;height:4px;border-radius:2px;background:var(--line)}
+.progress i.on{background:var(--accent)}
+
+/* sms drawer + modal */
+.drawer{position:fixed;right:16px;bottom:16px;width:min(380px,calc(100% - 32px));max-height:70vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.18);padding:16px;z-index:20;display:grid;gap:10px}
+.reviewed{display:flex;gap:8px;align-items:center;font-size:.85rem;color:var(--muted);margin:0}
+.reviewed svg{flex:none}
+.badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:99px;background:var(--danger);color:#fff;font-size:.72rem;font-weight:700;line-height:18px;text-align:center;font-family:var(--mono)}
+.thread{display:grid;gap:3px;text-align:left;width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer}
+.thread .badge{justify-self:start}
+.clip{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bubbles{display:grid;gap:8px;max-height:42vh;overflow:auto;padding:4px 2px}
+.bubble{max-width:85%;background:var(--bg);border:1px solid var(--line);border-radius:12px 12px 12px 4px;padding:8px 12px;display:grid;gap:2px;font-size:.9rem}
+.bubble .mono{font-size:.7rem;color:var(--muted)}
+.bubble.mine{justify-self:end;background:var(--accent-soft);border-color:transparent;border-radius:12px 12px 4px 12px}
+.small-btn{padding:6px 10px;font-size:.82rem;font-weight:500}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.sms{background:var(--bg);border-radius:10px;padding:10px 12px;font-size:.88rem;display:grid;gap:2px}
+.sms .mono{font-size:.75rem;color:var(--muted)}
+.scrim{position:fixed;inset:0;background:rgba(10,15,13,.45);display:grid;place-items:center;padding:16px;z-index:30}
+.modal{background:var(--surface);border-radius:16px;padding:24px;max-width:420px;width:100%;display:grid;gap:14px;text-align:center}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:.9rem;z-index:25;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:640px){.top{padding:10px 14px} h1{font-size:1.5rem}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+"use strict";
+var KEY = "idoc-demo-v6";
+
+/* ---------- words ---------- */
+var W = {
+en:{
+tag:"Community eye care", online:"Online", offline:"Offline", waiting:"{n} waiting to sync", sms:"Messages",
+demo:"Demo with sample data. This eye check is a screening, not a diagnosis.", reset:"Reset demo",
+reg_t:"Create your account", in_t:"Sign in", f_name:"Full name", f_phone:"Phone number", f_gender:"Gender", male:"Male", female:"Female",
+f_age:"Age", f_comm:"Community or town", create:"Create account", signin:"Sign in", no_acct:"No account with that phone number yet.", demo_accts:"Or open a demo account",
+hello:"Hello, {n}", scan:"Check my eyes", scan_sub:"Takes about 5 minutes. It is free.", last:"Last eye check", none_yet:"No eye checks yet.",
+my_appts:"My appointments", my_hist:"My eye records", tips:"Keep your eyes healthy", find:"Find eye care near me", signout:"Sign out", back:"Back",
+step:"Step {a} of {b}", consent_t:"Before we start",
+c1:"This is a short screening. It checks how well you see and asks about problems with your eyes.",
+c2:"It cannot find every eye disease. Only an eye doctor can tell you for sure.",
+c3:"Your results are saved in your IDOC record so you or your eye doctor can see them later.",
+c4:"We only share your record with the eye doctor you book.",
+agree:"I understand. Start", sym_t:"Do you have any of these?", sym_sub:"Tick all that apply. If none apply, just continue.",
+g_urg:"Needs care today", g_oth:"Other problems",
+s_sudden:"Sudden loss of sight, or a dark curtain over your vision", s_pain:"Severe eye pain", s_injury:"Recent injury to the eye", s_chem:"Chemical or hot liquid got into the eye",
+s_far:"Hard to see things far away", s_near:"Hard to read or see things close up", s_cloudy:"Cloudy or misty vision", s_red:"Red or painful eyes", s_discharge:"Discharge or sticky eyes",
+s_night:"Hard to see at night", s_glasses:"My glasses no longer help", s_diab:"I have diabetes or high blood pressure",
+cont:"Continue", prep_t:"Get ready for the reading test",
+p1:"Stand or sit 3 big steps (about 3 metres) from the screen.", p2:"If you use glasses for far things, wear them.", p3:"You will test one eye at a time. Cover the other eye with your palm, not your fingers.",
+p_demo:"Letter sizes here are for the demo. Real use needs a chart set up for the screen size.", ready:"I'm ready",
+eye_r:"Cover your LEFT eye. Look with your RIGHT eye.", eye_l:"Cover your RIGHT eye. Look with your LEFT eye.",
+which:"Which way are the arms of the E pointing?", up:"Up", right:"Right", down:"Down", left:"Left", cant:"I can't see it", line:"Line {l}",
+photo_t:"Eye photo for the eye doctor", photo_b:"Take a clear, close photo of both eyes in good light. An eye doctor looks at it later. The app does not judge the photo by itself.",
+photo_btn:"Take or choose a photo", photo_skip:"Skip photo", save:"Save my check",
+urg_t:"Get care today", urg_b:"Your answers include a warning sign. Go to the nearest hospital today. Do not wait for an online appointment.",
+ref_t:"See an eye doctor", ref_b:"This check found signs that an eye doctor should look at your eyes. Book a consultation below.",
+pass_t:"No warning signs found. Well done!", pass_b:"Your eyes passed this short check. It cannot find every eye problem, so check again in one year, or sooner if your sight changes.",
+learn:"Learn how to keep your eyes healthy", acu_t:"Reading test", acu_help:"6/6 is normal sight. The bigger the second number, the weaker the sight.",
+r_eye:"Right eye", l_eye:"Left eye", worse:"worse than 6/60", you_said:"You told us", none_sym:"No problems reported", book_c:"Book a consultation", nearest:"Nearest hospital",
+saved_off:"Saved on this device. It will upload when the network comes back.",
+care_t:"Eye care near you", all:"All", clinics:"Eye clinics", hosp:"Hospitals", pharm:"Pharmacies", km:"{d} km away", price:"Consultation", free:"Free phone consult",
+book:"Book", sample:"Sample listings for the demo. Real listings will show only confirmed partners and checked prices.",
+book_t:"Book an appointment", f_doc:"Eye doctor", f_date:"Date", f_time:"Time", f_mode:"How do you want to talk?", phone:"Phone call", video:"Video call",
+video_note:"Video needs good network. A phone call works on any phone.", f_note:"Comment (optional)", booked_t:"Request sent", booked_b:"You will be notified once the doctor is ready!", ok:"OK",
+st_requested:"Waiting for doctor", st_confirmed:"Confirmed", st_done:"Completed", st_missed:"Missed", no_appts:"No appointments yet.", dr_note:"Doctor's note", updates:"Updates", mark_read:"Mark as read",
+t1:"Check your eyes every year, especially if you are over 40 or have diabetes.", t2:"Never put herbs, breast milk or other home remedies in your eyes.", t3:"Use only eye drops a health worker gave you.",
+t4:"Wash your hands before touching your eyes.", t5:"Wear a hat or sunglasses in strong sun.", t6:"Protect your eyes when grinding, welding or cutting grass.", t7:"If your sight changes suddenly, go to a hospital the same day.",
+pick_doc:"Choose an eye doctor", need_dt:"Choose a date and a time.", for_who:"Booking for", open_r:"Open result", see_all:"See all", open:"Open", sms_note:"In the live system these arrive as SMS on any phone, no data needed.", close:"Close", f_lang:"Language", o_urgent:"Urgent", o_refer:"Needs eye doctor", o_pass:"No warning signs", reply_ph:"Type a reply", send:"Send", rev_by:"Draft for the demo. An optometrist will review it before real use.", rem_year:"We will send you an SMS reminder on {date} for your next eye check.", rem_day:"You will also get an SMS reminder the day before."
+},
+pcm:{
+tag:"Eye care for every community", online:"Network dey", offline:"No network", waiting:"{n} dey wait to sync", sms:"Message dem",
+demo:"Na demo with sample data. Dis eye check na screening, e no be diagnosis.", reset:"Start demo again",
+reg_t:"Open your account", in_t:"Enter your account", f_name:"Your name", f_phone:"Phone number", f_gender:"Gender", male:"Man", female:"Woman",
+f_age:"Age", f_comm:"Your area or town", create:"Open account", signin:"Enter", no_acct:"We no see account with dat number.", demo_accts:"Or open demo account",
+hello:"How far, {n}", scan:"Check my eye", scan_sub:"E go take like 5 minutes. E free.", last:"Last eye check", none_yet:"You never check your eye yet.",
+my_appts:"My appointment dem", my_hist:"My eye record dem", tips:"How to take care of your eye", find:"Find eye doctor near me", signout:"Comot", back:"Go back",
+step:"Step {a} for {b}", consent_t:"Before we start",
+c1:"Dis na short check. E go check how well you dey see and ask you about wahala for your eye.",
+c2:"E no fit find every eye sickness. Na only eye doctor fit tell you for sure.",
+c3:"We go keep your result for your IDOC record so you or your eye doctor fit see am later.",
+c4:"Na only the eye doctor wey you book we go show your record.",
+agree:"I don hear. Make we start", sym_t:"You get any of dis one?", sym_sub:"Tick all wey concern you. If none, just continue.",
+g_urg:"E need care today", g_oth:"Other wahala",
+s_sudden:"Your eye just stop to see sudden, or e be like dark cloth cover am", s_pain:"Eye pain wey strong well well", s_injury:"Something wound your eye recently", s_chem:"Chemical or hot water enter your eye",
+s_far:"E hard you to see far things", s_near:"E hard you to read or see near things", s_cloudy:"Your eye dey cloudy or misty", s_red:"Eye dey red or dey pain", s_discharge:"Eye dey bring water or e dey stick",
+s_night:"E hard you to see for night", s_glasses:"My glass no dey help again", s_diab:"I get sugar sickness (diabetes) or high BP",
+cont:"Continue", prep_t:"Make we prepare for the reading test",
+p1:"Stand or siddown like 3 big steps (about 3 metres) from the screen.", p2:"If you dey use glass for far things, wear am.", p3:"We go test one eye at a time. Use your palm cover the other eye, no be finger.",
+p_demo:"Dis letter size na for demo. Real one need chart wey dem set for the screen size.", ready:"I don ready",
+eye_r:"Cover your LEFT eye. Use your RIGHT eye look.", eye_l:"Cover your RIGHT eye. Use your LEFT eye look.",
+which:"Which side the E leg dey face?", up:"Up", right:"Right", down:"Down", left:"Left", cant:"I no fit see am", line:"Line {l}",
+photo_t:"Snap your eye for the eye doctor", photo_b:"Snap clear photo of your two eye for better light. Eye doctor go look am later. The app no dey judge the photo by itself.",
+photo_btn:"Snap or pick photo", photo_skip:"Skip photo", save:"Save my check",
+urg_t:"Go see doctor today", urg_b:"Wetin you talk get danger sign. Go the nearest hospital today. No wait for online appointment.",
+ref_t:"Go see eye doctor", ref_b:"Dis check see sign say eye doctor suppose look your eye. Book consultation for down.",
+pass_t:"We no see any danger sign. Well done!", pass_b:"Your eye pass dis short check. E no fit find every eye wahala, so check again after one year, or before if your eye change.",
+learn:"Learn how to take care of your eye", acu_t:"Reading test", acu_help:"6/6 na normal sight. As the second number big reach, na so the eye weak reach.",
+r_eye:"Right eye", l_eye:"Left eye", worse:"e weak pass 6/60", you_said:"Wetin you talk", none_sym:"You no talk any wahala", book_c:"Book consultation", nearest:"Hospital wey near",
+saved_off:"E don save for dis device. E go upload when network come back.",
+care_t:"Eye care wey near you", all:"All", clinics:"Eye clinic", hosp:"Hospital", pharm:"Pharmacy", km:"{d} km from here", price:"Consultation", free:"Free phone consult",
+book:"Book", sample:"Dis na sample list for demo. Real one go show only partner wey we confirm and price wey we check.",
+book_t:"Book appointment", f_doc:"Eye doctor", f_date:"Date", f_time:"Time", f_mode:"How you wan talk?", phone:"Phone call", video:"Video call",
+video_note:"Video need better network. Phone call fit work for any phone.", f_note:"Wetin you wan add (no be by force)", booked_t:"We don send am", booked_b:"We go tell you once the doctor ready!", ok:"OK",
+st_requested:"Dey wait for doctor", st_confirmed:"E don set", st_done:"E don finish", st_missed:"You miss am", no_appts:"No appointment yet.", dr_note:"Wetin doctor talk", updates:"Update", mark_read:"I don see am",
+t1:"Check your eye every year, especially if you don pass 40 or you get sugar sickness (diabetes).", t2:"No put herbs, breast milk or any native medicine for your eye.", t3:"Use only eye drop wey health worker give you.",
+t4:"Wash hand before you touch your eye.", t5:"Wear cap or sun glass for strong sun.", t6:"Cover your eye when you dey grind, weld or cut grass.", t7:"If your eye change sudden, go hospital that same day.",
+pick_doc:"Pick eye doctor", need_dt:"Pick date and time.", for_who:"Booking for", open_r:"Open result", see_all:"See all", open:"Open am", sms_note:"For the real system, dis message go enter as SMS for any phone, no need data.", close:"Close", f_lang:"Language", o_urgent:"E urgent", o_refer:"E need eye doctor", o_pass:"No danger sign", reply_ph:"Write your reply", send:"Send am", rev_by:"Na draft for demo. Optometrist go check am before we use am for real.", rem_year:"We go send you SMS reminder on {date} for your next eye check.", rem_day:"We go still send you SMS reminder one day before."},
+ha:{
+tag:"Kula da ido ga kowace al'umma", online:"Akwai network", offline:"Babu network", waiting:"{n} suna jiran a tura", sms:"Saƙonni",
+demo:"Wannan gwaji ne da bayanan misali. Wannan duban ido gwaji ne na farko, ba tabbatar da cuta ba.", reset:"Sake fara gwaji",
+reg_t:"Buɗe asusunka", in_t:"Shiga asusunka", f_name:"Cikakken suna", f_phone:"Lambar waya", f_gender:"Jinsi", male:"Namiji", female:"Mace",
+f_age:"Shekaru", f_comm:"Unguwa ko gari", create:"Buɗe asusu", signin:"Shiga", no_acct:"Babu asusu da wannan lambar waya tukuna.", demo_accts:"Ko buɗe asusun misali",
+hello:"Sannu, {n}", scan:"Duba idona", scan_sub:"Zai ɗauki kamar minti 5. Kyauta ne.", last:"Duban ido na ƙarshe", none_yet:"Ba a taɓa duba idonka ba tukuna.",
+my_appts:"Alƙawurana", my_hist:"Bayanan idona", tips:"Yadda za ka kula da idonka", find:"Nemo likitan ido kusa da ni", signout:"Fita", back:"Koma baya",
+step:"Mataki {a} cikin {b}", consent_t:"Kafin mu fara",
+c1:"Wannan gajeren gwaji ne. Yana duba yadda kake gani, kuma yana tambaya game da matsalolin idonka.",
+c2:"Ba zai iya gano kowace cutar ido ba. Likitan ido ne kaɗai zai iya tabbatarwa.",
+c3:"Za a ajiye sakamakonka a cikin bayananka na IDOC domin kai ko likitan idonka ku gani daga baya.",
+c4:"Likitan idon da ka zaɓa kaɗai za mu nuna wa bayananka.",
+agree:"Na fahimta. Mu fara", sym_t:"Kana da ɗaya daga cikin waɗannan?", sym_sub:"Zaɓi duk wanda ya shafe ka. Idan babu, ci gaba kawai.",
+g_urg:"Yana buƙatar kulawa yau", g_oth:"Sauran matsaloli",
+s_sudden:"Gani ya ɗauke farat ɗaya, ko kamar baƙin labule ya rufe idonka", s_pain:"Ciwon ido mai tsanani", s_injury:"Rauni a ido kwanan nan", s_chem:"Sinadari ko ruwan zafi ya shiga ido",
+s_far:"Yana maka wuya ka ga abu mai nisa", s_near:"Yana maka wuya ka karanta ko ka ga abu na kusa", s_cloudy:"Gani yana dishi-dishi", s_red:"Ido yana ja ko yana ciwo", s_discharge:"Ido yana fitar da kwantsa ko yana mannewa",
+s_night:"Yana maka wuya ka gani da dare", s_glasses:"Tabarau na ba ya taimaka mini kuma", s_diab:"Ina da ciwon suga ko hawan jini",
+cont:"Ci gaba", prep_t:"Shirya don gwajin karatu",
+p1:"Tsaya ko zauna nisan manyan takuna 3 (kamar mita 3) daga allon.", p2:"Idan kana sanya tabarau don ganin nesa, sanya su.", p3:"Za a gwada ido ɗaya bayan ɗaya. Rufe ɗayan idon da tafin hannunka, ba da yatsu ba.",
+p_demo:"Girman haruffan nan na gwaji ne kawai. Ainihin amfani yana buƙatar jadawalin da aka daidaita da girman allon.", ready:"Na shirya",
+eye_r:"Rufe idonka na HAGU. Duba da idonka na DAMA.", eye_l:"Rufe idonka na DAMA. Duba da idonka na HAGU.",
+which:"Ina ƙafafun harafin E suke nunawa?", up:"Sama", right:"Dama", down:"Ƙasa", left:"Hagu", cant:"Ban gani ba", line:"Layi {l}",
+photo_t:"Hoton ido don likitan ido", photo_b:"Ɗauki hoton idanunka biyu a kusa, a wuri mai haske. Likitan ido zai duba shi daga baya. Manhajar ba ta yanke hukunci a kan hoton da kanta.",
+photo_btn:"Ɗauki ko zaɓi hoto", photo_skip:"Tsallake hoto", save:"Ajiye gwajina",
+urg_t:"Nemi kulawa yau", urg_b:"Amsoshinka suna da alamar haɗari. Je asibiti mafi kusa yau. Kada ka jira ganawa ta intanet.",
+ref_t:"Ga likitan ido", ref_b:"Wannan gwaji ya ga alamun da ke nuna ya kamata likitan ido ya duba idanunka. Ɗauki lokacin ganawa a ƙasa.",
+pass_t:"Ba a ga alamar haɗari ba. Madalla!", pass_b:"Idanunka sun wuce wannan gajeren gwaji. Ba zai iya gano kowace matsalar ido ba, don haka sake dubawa bayan shekara ɗaya, ko kafin nan idan ganinka ya canja.",
+learn:"Koyi yadda za ka kula da idanunka", acu_t:"Gwajin karatu", acu_help:"6/6 gani ne na al'ada. Idan lamba ta biyu ta ƙara girma, gani yana ƙara rauni.",
+r_eye:"Idon dama", l_eye:"Idon hagu", worse:"ya fi 6/60 rauni", you_said:"Abin da ka faɗa mana", none_sym:"Ba ka ambaci wata matsala ba", book_c:"Ɗauki lokacin ganin likita", nearest:"Asibiti mafi kusa",
+saved_off:"An ajiye a wannan na'ura. Za a tura shi idan network ta dawo.",
+care_t:"Kula da ido kusa da kai", all:"Duka", clinics:"Asibitocin ido", hosp:"Asibitoci", pharm:"Kantunan magani", km:"Nisan km {d}", price:"Kuɗin ganin likita", free:"Shawarar waya kyauta",
+book:"Ɗauki lokaci", sample:"Waɗannan misalai ne na gwaji. Ainihin jerin zai nuna abokan hulɗa da aka tabbatar da farashin da aka bincika kaɗai.",
+book_t:"Ɗauki lokacin ganawa", f_doc:"Likitan ido", f_date:"Rana", f_time:"Lokaci", f_mode:"Ta yaya kake so ku yi magana?", phone:"Kiran waya", video:"Kiran bidiyo",
+video_note:"Bidiyo yana buƙatar network mai kyau. Kiran waya yana aiki a kowace waya.", f_note:"Ƙarin bayani (ba dole ba)", booked_t:"An tura buƙatarka", booked_b:"Za a sanar da kai da zarar likitan ya shirya!", ok:"To",
+st_requested:"Ana jiran likita", st_confirmed:"An tabbatar", st_done:"An kammala", st_missed:"Ba a samu ba", no_appts:"Babu alƙawari tukuna.", dr_note:"Bayanin likita", updates:"Sabbin bayanai", mark_read:"Na gani",
+t1:"Duba idanunka kowace shekara, musamman idan ka haura shekaru 40 ko kana da ciwon suga.", t2:"Kada ka zuba ganye, nonon uwa ko wani maganin gargajiya a idonka.", t3:"Yi amfani da maganin ido da ma'aikacin lafiya ya ba ka kaɗai.",
+t4:"Wanke hannu kafin ka taɓa idonka.", t5:"Sanya hula ko tabarau a cikin rana mai zafi.", t6:"Kare idonka lokacin niƙa, walda ko yankan ciyawa.", t7:"Idan ganinka ya canja farat ɗaya, je asibiti a ranar.",
+pick_doc:"Zaɓi likitan ido", need_dt:"Zaɓi rana da lokaci.", for_who:"Ana ɗaukar lokaci don", open_r:"Buɗe sakamako", see_all:"Duba duka", open:"Buɗe", sms_note:"A ainihin tsarin, waɗannan za su zo a matsayin SMS a kowace waya, ba sai da data ba.", close:"Rufe", f_lang:"Harshe", o_urgent:"Gaggawa", o_refer:"Yana buƙatar likitan ido", o_pass:"Babu alamar haɗari", reply_ph:"Rubuta amsa", send:"Aika", rev_by:"Wannan daftari ne na gwaji. Likitan ido (optometrist) zai duba shi kafin a yi amfani da shi a zahiri.", rem_year:"Za mu aiko maka da SMS na tunatarwa ranar {date} don duba idonka na gaba.", rem_day:"Za a kuma aiko maka da SMS na tunatarwa kwana ɗaya kafin ranar."
+}};
+var LN = {en:"English", pcm:"Pidgin", ha:"Hausa"};
+/* SMS text: plain letters only, so messages stay short and readable on any basic phone */
+var SW = {
+en:{saved:"IDOC: Your eye check is saved. {x}", pass:"No warning signs found. Check again in 1 year.", refer:"Please see an eye doctor. Reply BOOK or call your IDOC facilitator.", urgent:"Warning sign. Go to the nearest hospital TODAY.",
+ req:"IDOC: Your request to see {d} on {date} at {time} was received. You will get an SMS once the doctor is ready.", ready:"IDOC: {d} is ready for you on {date} at {time}. Keep your phone on.",
+ note:"IDOC: {d} left you a note: {n}", remind:"IDOC: Hello {n}, your eye check showed you should see an eye doctor. Call Halima at the {s} or reply BOOK. Free consults are available.",
+ conf:"{d} confirmed your {m} for {date} at {time}.", missed:"IDOC: You missed your call with {d}. Reply to this message to choose a new time.", phone:"phone call", video:"video call",
+ rem_appt:"IDOC reminder: Your {m} with {d} is tomorrow, {date} at {time}. Keep your phone on.", rem_check:"IDOC: Hello {n}, it is 1 year since your last eye check. Come to the {s} for a free check."},
+pcm:{saved:"IDOC: We don save your eye check. {x}", pass:"We no see danger sign. Check again after 1 year.", refer:"Abeg go see eye doctor. Reply BOOK or call your IDOC facilitator.", urgent:"Danger sign. Go the nearest hospital TODAY.",
+ req:"IDOC: We don receive your request to see {d} on {date} by {time}. We go send you SMS once the doctor ready.", ready:"IDOC: {d} don ready for you on {date} by {time}. Make sure your phone dey on.",
+ note:"IDOC: {d} leave message for you: {n}", remind:"IDOC: How far {n}, your eye check show say you suppose see eye doctor. Call Halima for {s} or reply BOOK. Free consult dey.",
+ conf:"{d} don confirm your {m} for {date} by {time}.", missed:"IDOC: You miss your call with {d}. Reply dis message make we pick another time.", phone:"phone call", video:"video call",
+ rem_appt:"IDOC reminder: Your {m} with {d} na tomorrow, {date} by {time}. Make sure your phone dey on.", rem_check:"IDOC: How far {n}, e don reach 1 year since you check your eye. Come {s} make we check am free."},
+ha:{saved:"IDOC: An ajiye duban idonka. {x}", pass:"Ba a ga alamar hadari ba. Sake dubawa bayan shekara 1.", refer:"Don Allah ka ga likitan ido. Amsa da BOOK ko ka kira mai taimaka maka na IDOC.", urgent:"Alamar hadari. Je asibiti mafi kusa YAU.",
+ req:"IDOC: An karbi bukatarka ta ganin {d} ranar {date} da karfe {time}. Za a aiko maka da SMS da zarar likitan ya shirya.", ready:"IDOC: An shirya ganawarka da {d} ranar {date} da karfe {time}. Ka bar wayarka a kunne.",
+ note:"IDOC: Sako daga {d}: {n}", remind:"IDOC: Sannu {n}, duban idonka ya nuna ya kamata ka ga likitan ido. Kira Halima a {s} ko ka amsa da BOOK. Akwai shawarar likita kyauta.",
+ conf:"{d} ya tabbatar da {m} ranar {date} da ƙarfe {time}.", missed:"IDOC: Ba a same ka ba a kiran {d}. Amsa wannan sako don zabar wani lokaci.", phone:"kiran waya", video:"kiran bidiyo",
+ rem_appt:"IDOC tunatarwa: {m} da {d} gobe ne, {date} da karfe {time}. Ka bar wayarka a kunne.", rem_check:"IDOC: Sannu {n}, shekara 1 ke nan da duba idonka. Zo {s} don duba ido kyauta."}
+};
+function sw(lang, k, v){ var s = (SW[lang]||SW.en)[k]; for(var x in v){ s = s.split("{"+x+"}").join(v[x]); } return s; }
+function plang(pid){ var p = P(pid); return (p && p.lang) || "en"; }
+function smsTo(pid, k, v, from){ msg(from || "f", "p:"+pid, sw(plang(pid), k, v)); }
+/* parties: "p:<patient id>", "d:<provider id>", "f" = station facilitator, "s" = IDOC system (no replies) */
+function msg(from, to, text){ S.msgs.push({id:uid("m"), from:from, to:to, text:text, at:stamp(0), read:false}); }
+function staff(to, text){ msg("s", to, text); }
+function meParty(){ return S.role === "patient" ? (S.patientId ? "p:"+S.patientId : null) : S.role === "doctor" ? "d:"+S.docProv : "f"; }
+function partyName(x){
+  if(x === "s") return "IDOC system";
+  if(x === "f") return S.role === "patient" ? "IDOC · Halima (facilitator)" : "Halima Yusuf · Facilitator";
+  var id = x.slice(2);
+  if(x.indexOf("p:") === 0){ var pt = P(id); return pt ? pt.name : "Patient"; }
+  if(x.indexOf("d:") === 0){ var v = PV(id); return (S.role === "patient" ? "IDOC · " : "")+(v ? v.doctor : "Doctor"); }
+  return x;
+}
+function partyPhone(x){ if(x.indexOf("p:") === 0){ var pt = P(x.slice(2)); return pt ? pt.phone : ""; } if(x.indexOf("d:") === 0){ var v = PV(x.slice(2)); return v ? v.phone : ""; } return x === "f" ? "0803 000 0010" : "IDOC"; }
+function unreadFor(x){ return x ? S.msgs.filter(function(m){ return m.to === x && !m.read; }).length : 0; }
+function threadsFor(x){
+  var map = {};
+  S.msgs.forEach(function(m){ if(m.to !== x && m.from !== x) return; var o = m.to === x ? m.from : m.to; (map[o] = map[o] || []).push(m); });
+  return Object.keys(map).map(function(o){ var l = map[o].sort(function(a,b){ return a.at < b.at ? -1 : 1; }); return {other:o, msgs:l, last:l[l.length-1], unread:l.filter(function(m){ return m.to === x && !m.read; }).length}; })
+    .sort(function(a,b){ return a.last.at < b.last.at ? 1 : -1; });
+}
+function t(k, v){ var s = (W[S.lang] && W[S.lang][k]) || W.en[k] || k; if(v){ for(var x in v){ s = s.split("{"+x+"}").join(v[x]); } } return s; }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+
+/* ---------- clinical rules (to be approved by the clinical adviser) ---------- */
+var LEVELS = [{l:"6/60",px:150},{l:"6/36",px:110},{l:"6/24",px:82},{l:"6/18",px:62},{l:"6/12",px:44},{l:"6/9",px:32},{l:"6/6",px:22}];
+var URGENT = ["s_sudden","s_pain","s_injury","s_chem"];
+var REFER = ["s_far","s_near","s_cloudy","s_red","s_discharge","s_night","s_glasses","s_diab"];
+var DIRS = ["up","right","down","left"];
+var SLOTS = ["09:00","10:30","12:00","14:00","15:30"];
+function acuityLabel(i){ return i < 0 ? t("worse") : LEVELS[i].l; }
+function outcomeOf(sym, ac){
+  if(sym.some(function(s){ return URGENT.indexOf(s) > -1; })) return "urgent";
+  if(ac.right < 4 || ac.left < 4) return "refer";            /* worse than 6/12 in either eye */
+  if(Math.abs(ac.right - ac.left) >= 2) return "refer";      /* two or more lines difference */
+  if(sym.some(function(s){ return REFER.indexOf(s) > -1; })) return "refer";
+  return "pass";
+}
+
+/* ---------- data ---------- */
+function day(n){ var d = new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function stamp(n){ var d = new Date(); d.setDate(d.getDate()+(n||0)); return d.toISOString(); }
+function uid(p){ return p + Math.random().toString(36).slice(2,8); }
+function fmtD(iso){ try{ return new Date(iso.length === 10 ? iso+"T12:00:00" : iso).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}); }catch(e){ return iso; } }
+function fmtT(iso){ try{ return new Date(iso).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}); }catch(e){ return ""; } }
+
+function seed(){
+  return {
+    lang:"en", role:"patient", online:true, patientId:null, facPatientId:null, docProv:"pv1",
+    view:{patient:"home", facilitator:"dash", doctor:"list"}, param:{patient:null, facilitator:null, doctor:null},
+    flow:null, inbox:{open:false, thread:null}, modal:null, careTab:"all",
+    station:"Nyanya Community Hub",
+    providers:[
+      {id:"pv1", kind:"clinic", name:"Urban Sight Eye Clinic", doctor:"Urban Sight optician", role:"Optician", km:null, area:"Nyanya", services:"Eye care in Nyanya. Takes IDOC referrals by WhatsApp.", price:"Reduced price for underserved patients", free:false, phone:"", modes:["phone","video"]},
+      {id:"pv2", kind:"clinic", name:"Karu Vision Centre", doctor:"Dr. Kingsley Omo", role:"Ophthalmologist", km:4.5, services:"Specialist exam, cataract assessment, surgery referral", price:"₦8,000 – ₦15,000", free:true, phone:"0803 000 0002", modes:["phone"]},
+      {id:"pv3", kind:"hosp", name:"Nearest General Hospital", doctor:null, km:2.4, services:"Accident and emergency, outpatient referral to eye unit", price:"₦2,500 card + tests", free:false, phone:"0803 000 0003", modes:[]},
+      {id:"pv4", kind:"pharm", name:"Mararaba Road Pharmacy", doctor:null, km:0.9, services:"Prescribed eye drops, reading glasses", price:"Varies by item", free:false, phone:"0803 000 0004", modes:[]}
+    ],
+    patients:[
+      {id:"p1", name:"Blessing Okoro", phone:"08030000101", gender:"female", age:58, community:"Nyanya", lang:"pcm"},
+      {id:"p2", name:"Tunde Adebayo", phone:"08030000102", gender:"male", age:34, community:"Mararaba", lang:"en"},
+      {id:"p3", name:"Grace Efe", phone:"08030000103", gender:"female", age:46, community:"Karu", lang:"en"},
+      {id:"p4", name:"Peter Oghene", phone:"08030000104", gender:"male", age:62, community:"Nyanya", lang:"pcm"},
+      {id:"p5", name:"Aisha Bello", phone:"08030000105", gender:"female", age:39, community:"Nyanya", lang:"ha"},
+      {id:"p6", name:"Musa Abdullahi", phone:"08030000106", gender:"male", age:55, community:"Mararaba", lang:"ha"},
+      {id:"p7", name:"Hauwa Sani", phone:"08030000107", gender:"female", age:44, community:"Nyanya", lang:"ha"}
+    ],
+    screenings:[
+      {id:"s1", pid:"p1", at:stamp(-6), assisted:true, sym:["s_cloudy","s_night"], ac:{right:2,left:1}, photo:null, outcome:"refer", synced:true},
+      {id:"s2", pid:"p2", at:stamp(-4), assisted:false, sym:[], ac:{right:6,left:6}, photo:null, outcome:"pass", synced:true},
+      {id:"s3", pid:"p3", at:stamp(-3), assisted:true, sym:["s_diab","s_near"], ac:{right:4,left:3}, photo:null, outcome:"refer", synced:true},
+      {id:"s4", pid:"p4", at:stamp(-9), assisted:true, sym:["s_far","s_glasses"], ac:{right:2,left:3}, photo:null, outcome:"refer", synced:true},
+      {id:"s5", pid:"p5", at:stamp(-12), assisted:true, sym:["s_red","s_discharge"], ac:{right:5,left:5}, photo:null, outcome:"refer", synced:true},
+      {id:"s6", pid:"p6", at:stamp(-2), assisted:true, sym:["s_cloudy","s_diab"], ac:{right:1,left:3}, photo:null, outcome:"refer", synced:true},
+      {id:"s7", pid:"p7", at:stamp(-368), assisted:true, sym:[], ac:{right:6,left:5}, photo:null, outcome:"pass", synced:true}
+    ],
+    appts:[
+      {id:"a1", pid:"p1", sid:"s1", prov:"pv1", date:day(1), time:"10:30", mode:"phone", note:"My eyes have been misty for about a year.", status:"confirmed", synced:true, created:stamp(-5)},
+      {id:"a2", pid:"p4", sid:"s4", prov:"pv2", date:day(-2), time:"12:00", mode:"phone", note:"", status:"missed", synced:true, created:stamp(-8)},
+      {id:"a3", pid:"p3", sid:"s3", prov:"pv1", date:day(2), time:"14:00", mode:"video", note:"Can I get glasses for reading?", status:"requested", synced:true, created:stamp(-1)},
+      {id:"a4", pid:"p5", sid:"s5", prov:"pv1", date:day(-10), time:"09:00", mode:"phone", note:"Idona yana ja yana kaikayi.", status:"done", outcome:"Needs in-person eye exam", docNote:"Spoke with Aisha in Hausa through the facilitator. Likely eye infection. Please come to the clinic this week so I can examine it. Do not put any home remedy in the eye.", synced:true, created:stamp(-11)}
+    ],
+    notifs:[
+      {id:"n1", pid:"p1", text:"Urban Sight optician don confirm your phone call for "+fmtD(day(1))+" by 10:30.", at:stamp(-4), read:false}
+    ],
+    msgs:[
+      {id:"m1", from:"s", to:"d:pv1", text:"New request: Blessing Okoro, 58, speaks Pidgin. Phone call on "+fmtD(day(1))+" at 10:30. Note: My eyes have been misty for about a year.", at:stamp(-5), read:true},
+      {id:"m2", from:"d:pv1", to:"p:p1", text:"IDOC: Urban Sight optician don ready for you on "+fmtD(day(1))+" by 10:30. Make sure your phone dey on.", at:stamp(-4), read:false},
+      {id:"m3", from:"p:p1", to:"d:pv1", text:"OK, thank you. I go dey wait.", at:stamp(-4), read:false},
+      {id:"m4", from:"d:pv1", to:"p:p5", text:"IDOC: Sako daga Urban Sight optician: Please come to the clinic this week so I can examine the eye.", at:stamp(-10), read:true},
+      {id:"m5", from:"p:p5", to:"d:pv1", text:"To, na gode. Zan zo ranar Alhamis.", at:stamp(-10), read:true},
+      {id:"m6", from:"s", to:"f", text:"Peter Oghene missed his phone call with Dr. Kingsley Omo on "+fmtD(day(-2))+". Please follow up.", at:stamp(-2), read:false},
+      {id:"m7", from:"s", to:"d:pv1", text:"New request: Grace Efe, 46, speaks English. Video call on "+fmtD(day(2))+" at 14:00. Note: Can I get glasses for reading?", at:stamp(-1), read:false},
+      {id:"m8", from:"s", to:"f", text:"New referral: Musa Abdullahi (08030000106) needs an eye doctor. Not booked yet.", at:stamp(-2), read:false}
+    ],
+    contacted:{}, remSent:{}
+  };
+}
+var S;
+try{ S = JSON.parse(localStorage.getItem(KEY)); }catch(e){ S = null; }
+if(!S || !S.providers) S = seed();
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+function P(id){ return S.patients.filter(function(p){ return p.id === id; })[0]; }
+function PV(id){ return S.providers.filter(function(p){ return p.id === id; })[0]; }
+function SC(id){ return S.screenings.filter(function(s){ return s.id === id; })[0]; }
+function screensOf(pid){ return S.screenings.filter(function(s){ return s.pid === pid; }).sort(function(a,b){ return a.at < b.at ? 1 : -1; }); }
+function apptsOf(pid){ return S.appts.filter(function(a){ return a.pid === pid; }).sort(function(a,b){ return a.created < b.created ? 1 : -1; }); }
+function pending(){ return S.screenings.filter(function(s){ return !s.synced; }).length + S.appts.filter(function(a){ return !a.synced; }).length; }
+function ctxPid(){ return S.role === "facilitator" ? S.facPatientId : S.patientId; }
+function notify(pid, text){ S.notifs.unshift({id:uid("n"), pid:pid, text:text, at:stamp(0), read:false}); }
+var toastMsg = null, toastTimer = null;
+function toast(m){ toastMsg = m; clearTimeout(toastTimer); toastTimer = setTimeout(function(){ toastMsg = null; render(); }, 3200); }
+function go(v, p){ S.view[S.role] = v; S.param[S.role] = p == null ? null : p; }
+
+/* ---------- small parts ---------- */
+var EYE = '<svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M2 16c4-6.5 8.7-9.5 14-9.5S26 9.5 30 16c-4 6.5-8.7 9.5-14 9.5S6 22.5 2 16z"/><circle cx="16" cy="16" r="4.6" fill="currentColor" stroke="none"/></svg>';
+var EYE_BIG = '<svg width="56" height="56" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 16c4-6.5 8.7-9.5 14-9.5S26 9.5 30 16c-4 6.5-8.7 9.5-14 9.5S6 22.5 2 16z"/><circle cx="16" cy="16" r="4.6" fill="currentColor" stroke="none"/></svg>';
+function eSvg(dir, px){
+  var rot = {right:0, down:90, left:180, up:270}[dir];
+  return '<svg width="'+px+'" height="'+px+'" viewBox="0 0 5 5" style="transform:rotate('+rot+'deg)" role="img" aria-label="Letter E"><rect x="0" y="0" width="1" height="5"/><rect x="0" y="0" width="5" height="1"/><rect x="0" y="2" width="5" height="1"/><rect x="0" y="4" width="5" height="1"/></svg>';
+}
+function outPill(o){ var c = {urgent:"danger", refer:"warn", pass:"ok"}[o]; return '<span class="pill '+c+'">'+esc(t("o_"+o))+'</span>'; }
+function stPill(s){ var c = {requested:"warn", confirmed:"acc", done:"ok", missed:"danger"}[s]; return '<span class="pill '+c+'">'+esc(t("st_"+s))+'</span>'; }
+function syncPill(x){ return x.synced ? "" : ' <span class="pill warn">Not synced</span>'; }
+function back(v){ return '<div><button class="btn ghost" data-a="go" data-v="'+v+'">← '+esc(t("back"))+'</button></div>'; }
+function home(){ return S.role === "facilitator" ? "dash" : "home"; }
+
+/* ---------- header ---------- */
+function header(){
+  var n = pending();
+  return '<header class="top">'+
+    '<div class="brand">'+EYE+'<div><b>IDOC</b><span>'+esc(t("tag"))+'</span></div></div>'+
+    '<div class="seg" role="group" aria-label="Who is using IDOC">'+
+      ["patient","facilitator","doctor"].map(function(r){ var u = unreadFor(r === "patient" ? (S.patientId ? "p:"+S.patientId : null) : r === "doctor" ? "d:"+S.docProv : "f"); return '<button data-a="role" data-v="'+r+'" aria-pressed="'+(S.role===r)+'">'+({patient:"Patient",facilitator:"Facilitator",doctor:"Doctor"})[r]+(u?' <span class="badge">'+u+'</span>':'')+'</button>'; }).join("")+
+    '</div>'+
+    '<div class="tools">'+
+      '<div class="seg" role="group" aria-label="Language"><button data-a="lang" data-v="en" aria-pressed="'+(S.lang==="en")+'">English</button><button data-a="lang" data-v="pcm" aria-pressed="'+(S.lang==="pcm")+'">Pidgin</button><button data-a="lang" data-v="ha" aria-pressed="'+(S.lang==="ha")+'">Hausa</button></div>'+
+      '<button class="chip'+(S.online?"":" off")+'" data-a="net" title="Switch network on or off to test offline use"><span class="dot"></span>'+esc(S.online?t("online"):t("offline"))+(n?' · '+esc(t("waiting",{n:n})):"")+'</button>'+
+      (meParty() ? '<button class="chip" data-a="inbox">'+esc(t("sms"))+(unreadFor(meParty())?' <span class="badge">'+unreadFor(meParty())+'</span>':'')+'</button>' : '')+
+    '</div></header>'+
+    '<div class="demo"><span>'+esc(t("demo"))+'</span><button class="linkbtn" data-a="reset">'+esc(t("reset"))+'</button></div>';
+}
+
+/* ---------- auth ---------- */
+function authView(){
+  var tab = S.param.patient === "in" ? "in" : "reg";
+  var h = '<div class="card"><div class="tabs"><button data-a="authTab" data-v="reg" aria-pressed="'+(tab==="reg")+'">'+esc(t("reg_t"))+'</button><button data-a="authTab" data-v="in" aria-pressed="'+(tab==="in")+'">'+esc(t("in_t"))+'</button></div>';
+  if(tab === "reg"){
+    h += '<form data-form="register" class="stack">'+regFields()+'<button class="btn primary full" type="submit">'+esc(t("create"))+'</button></form>';
+  } else {
+    h += '<form data-form="signin" class="stack"><label class="f" for="si-phone">'+esc(t("f_phone"))+'<input id="si-phone" name="phone" type="tel" required placeholder="0803 000 0000"></label><button class="btn primary full" type="submit">'+esc(t("signin"))+'</button></form>';
+  }
+  h += '</div><div class="card"><h3>'+esc(t("demo_accts"))+'</h3><div class="row">'+
+    S.patients.map(function(p){ return '<button class="btn" data-a="asPatient" data-id="'+p.id+'">'+esc(p.name)+' <span class="muted small">'+LN[p.lang||"en"]+'</span></button>'; }).join("")+'</div></div>';
+  return h;
+}
+function regFields(pre){
+  pre = pre || "r";
+  return '<div class="f"><span>'+esc(t("f_lang"))+'</span><div class="opts">'+["en","pcm","ha"].map(function(l){ return '<label class="opt"><input id="'+pre+'-l-'+l+'" type="radio" name="lang" value="'+l+'"'+(S.lang===l?" checked":"")+'><span>'+LN[l]+'</span></label>'; }).join("")+'</div></div>'+'<label class="f" for="'+pre+'-name">'+esc(t("f_name"))+'<input id="'+pre+'-name" name="name" type="text" required autocomplete="name"></label>'+
+    '<label class="f" for="'+pre+'-phone">'+esc(t("f_phone"))+'<input id="'+pre+'-phone" name="phone" type="tel" required placeholder="0803 000 0000"></label>'+
+    '<div class="f"><span>'+esc(t("f_gender"))+'</span><div class="opts">'+
+      '<label class="opt"><input id="'+pre+'-g-f" type="radio" name="gender" value="female" required><span>'+esc(t("female"))+'</span></label>'+
+      '<label class="opt"><input id="'+pre+'-g-m" type="radio" name="gender" value="male"><span>'+esc(t("male"))+'</span></label></div></div>'+
+    '<div class="row" style="align-items:start"><label class="f" for="'+pre+'-age" style="flex:1;min-width:100px">'+esc(t("f_age"))+'<input id="'+pre+'-age" name="age" type="number" min="1" max="120" required></label>'+
+    '<label class="f" for="'+pre+'-comm" style="flex:2;min-width:160px">'+esc(t("f_comm"))+'<input id="'+pre+'-comm" name="community" type="text" required></label></div>';
+}
+
+/* ---------- patient ---------- */
+function patientView(){
+  if(!S.patientId) return '<div class="narrow">'+authView()+'</div>';
+  if(S.flow && S.flow.role === "patient") return '<div class="narrow">'+flowView()+'</div>';
+  var v = S.view.patient, p = S.param.patient, body;
+  if(v === "result") body = resultView(p);
+  else if(v === "care") body = careView();
+  else if(v === "book") body = bookView(p);
+  else if(v === "appts") body = apptsView();
+  else if(v === "hist") body = histView();
+  else if(v === "tips") body = tipsView();
+  else body = patientHome();
+  return '<div class="narrow">'+body+'</div>';
+}
+function patientHome(){
+  var me = P(S.patientId), last = screensOf(me.id)[0], ap = apptsOf(me.id);
+  var nt = S.notifs.filter(function(n){ return n.pid === me.id && !n.read; });
+  var h = '<div class="row between"><h1>'+esc(t("hello",{n:me.name.split(" ")[0]}))+'</h1><button class="btn ghost" data-a="signout">'+esc(t("signout"))+'</button></div>';
+  if(nt.length) h += '<div class="card"><div class="row between"><h3>'+esc(t("updates"))+'</h3><button class="linkbtn" data-a="readAll">'+esc(t("mark_read"))+'</button></div>'+
+    nt.map(function(n){ return '<div class="notice">'+esc(n.text)+'</div>'; }).join("")+'</div>';
+  h += '<button class="giant" data-a="startCheck">'+EYE_BIG+'<b>'+esc(t("scan"))+'</b><span>'+esc(t("scan_sub"))+'</span></button>';
+  h += '<div class="card"><h3>'+esc(t("last"))+'</h3>'+(last ?
+    '<div class="row between"><span>'+fmtD(last.at)+syncPill(last)+'</span>'+outPill(last.outcome)+'</div><div class="row"><button class="btn" data-a="go" data-v="result" data-p="'+last.id+'">'+esc(t("open_r"))+'</button><button class="btn" data-a="go" data-v="hist">'+esc(t("my_hist"))+'</button></div>'
+    : '<p class="muted">'+esc(t("none_yet"))+'</p>')+'</div>';
+  h += '<div class="card"><div class="row between"><h3>'+esc(t("my_appts"))+'</h3><button class="linkbtn" data-a="go" data-v="appts">'+esc(t("see_all"))+'</button></div>'+
+    (ap.length ? apptLine(ap[0]) : '<p class="muted">'+esc(t("no_appts"))+'</p>')+'</div>';
+  h += '<div class="row"><button class="btn" data-a="go" data-v="care">'+esc(t("find"))+'</button><button class="btn" data-a="go" data-v="tips">'+esc(t("tips"))+'</button></div>';
+  return h;
+}
+function apptLine(a){
+  var pv = PV(a.prov);
+  return '<div class="item"><div class="row between"><b>'+esc(pv.doctor || pv.name)+'</b>'+stPill(a.status)+'</div>'+
+    '<span class="muted small">'+esc(pv.name)+' · '+fmtD(a.date)+' · <span class="mono">'+esc(a.time)+'</span> · '+esc(t(a.mode))+syncPill(a)+'</span>'+
+    (a.docNote ? '<div class="notice"><b>'+esc(t("dr_note"))+':</b> '+esc(a.docNote)+'</div>' : '')+'</div>';
+}
+function apptsView(){
+  var ap = apptsOf(S.patientId);
+  return back("home")+'<h1>'+esc(t("my_appts"))+'</h1><div class="card"><div class="list">'+(ap.length ? ap.map(apptLine).join("") : '<p class="muted">'+esc(t("no_appts"))+'</p>')+'</div></div>';
+}
+function histView(){
+  var sc = screensOf(S.patientId);
+  return back("home")+'<h1>'+esc(t("my_hist"))+'</h1><div class="card"><div class="list">'+(sc.length ? sc.map(function(s){
+    return '<div class="item"><div class="row between"><b>'+fmtD(s.at)+'</b>'+outPill(s.outcome)+'</div><span class="muted small">'+esc(t("r_eye"))+' <span class="mono">'+esc(acuityLabel(s.ac.right))+'</span> · '+esc(t("l_eye"))+' <span class="mono">'+esc(acuityLabel(s.ac.left))+'</span>'+syncPill(s)+'</span><div><button class="linkbtn" data-a="go" data-v="result" data-p="'+s.id+'">'+esc(t("open"))+'</button></div></div>';
+  }).join("") : '<p class="muted">'+esc(t("none_yet"))+'</p>')+'</div></div>';
+}
+function tipsView(){
+  return back(home())+'<h1>'+esc(t("tips"))+'</h1><div class="card"><ul class="plain">'+["t1","t2","t3","t4","t5","t6","t7"].map(function(k){ return '<li>'+esc(t(k))+'</li>'; }).join("")+'</ul></div>'+reviewed();
+}
+function reviewed(){ return '<p class="reviewed"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2v4.3" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="4.9" r="1" fill="currentColor"/></svg>'+esc(t("rev_by"))+'</p>'; }
+function addDays(iso, n){ var d = new Date(iso); d.setDate(d.getDate()+n); return d.toISOString(); }
+/* reminders: day-before appointment, and one year after the last check */
+function dueReminders(){
+  var out = [], tomorrow = day(1), yearAgo = addDays(stamp(0), -365);
+  S.appts.forEach(function(a){
+    if(a.synced && (a.status === "confirmed" || a.status === "requested") && a.date === tomorrow && !S.remSent["appt:"+a.id])
+      out.push({key:"appt:"+a.id, pid:a.pid, kind:"Appointment tomorrow", detail:PV(a.prov).doctor+" · "+a.time+" · "+(a.mode==="video"?"video":"phone")});
+  });
+  S.patients.forEach(function(p){
+    var last = screensOf(p.id)[0];
+    if(last && last.at <= yearAgo && !S.remSent["check:"+last.id])
+      out.push({key:"check:"+last.id, pid:p.id, kind:"Yearly re-check", detail:"Last check "+fmtD(last.at)});
+  });
+  return out;
+}
+function upcomingRechecks(){
+  return S.patients.map(function(p){ var l = screensOf(p.id)[0]; return l ? {p:p, due:addDays(l.at,365)} : null; })
+    .filter(function(x){ return x && x.due > stamp(0); }).sort(function(a,b){ return a.due < b.due ? -1 : 1; }).slice(0,3);
+}
+function sendDue(){
+  var list = dueReminders();
+  list.forEach(function(r){
+    var pt = P(r.pid);
+    if(r.key.indexOf("appt:") === 0){
+      var a = S.appts.filter(function(x){ return "appt:"+x.id === r.key; })[0], L = plang(pt.id);
+      smsTo(pt.id, "rem_appt", {m:sw(L, a.mode, {}), d:PV(a.prov).doctor, date:fmtD(a.date), time:a.time});
+    } else smsTo(pt.id, "rem_check", {n:pt.name.split(" ")[0], s:S.station});
+    S.remSent[r.key] = stamp(0);
+  });
+  return list.length;
+}
+
+/* ---------- screening flow ---------- */
+function startFlow(pid){
+  S.flow = {role:S.role, pid:pid, step:"consent", sym:[], eye:"right", lvl:0, trial:0, ok:0, dir:rand(), best:-1, ac:{}, photo:null};
+}
+function rand(prev){ var d; do{ d = DIRS[Math.floor(Math.random()*4)]; }while(d === prev); return d; }
+var STEPS = ["consent","symptoms","prep","acuity","photo"];
+function flowView(){
+  var f = S.flow, idx = STEPS.indexOf(f.step), who = P(f.pid);
+  var h = '<div class="row between"><button class="btn ghost" data-a="cancelFlow">← '+esc(t("back"))+'</button><span class="muted small">'+esc(t("step",{a:idx+1,b:STEPS.length}))+'</span></div>'+
+    '<div class="progress" aria-hidden="true">'+STEPS.map(function(s,i){ return '<i class="'+(i<=idx?"on":"")+'"></i>'; }).join("")+'</div>';
+  if(S.role === "facilitator") h += '<div class="notice">Assisted check for <b>'+esc(who.name)+'</b>, '+esc(who.age)+'</div>';
+  if(f.step === "consent"){
+    h += '<div class="card"><h2>'+esc(t("consent_t"))+'</h2><ul class="plain">'+["c1","c2","c3","c4"].map(function(k){ return '<li>'+esc(t(k))+'</li>'; }).join("")+'</ul><button class="btn primary full" data-a="flowNext" data-v="symptoms">'+esc(t("agree"))+'</button></div>';
+  } else if(f.step === "symptoms"){
+    var box = function(k, urg){ return '<label class="check'+(urg?" urg":"")+'" for="sym-'+k+'"><input id="sym-'+k+'" type="checkbox" name="sym" value="'+k+'"'+(f.sym.indexOf(k)>-1?" checked":"")+'><span>'+esc(t(k))+'</span></label>'; };
+    h += '<form class="card" data-form="symptoms"><h2>'+esc(t("sym_t"))+'</h2><p class="muted">'+esc(t("sym_sub"))+'</p>'+
+      '<h3 style="color:var(--danger)">'+esc(t("g_urg"))+'</h3><div class="stack">'+URGENT.map(function(k){ return box(k,true); }).join("")+'</div>'+
+      '<h3>'+esc(t("g_oth"))+'</h3><div class="stack">'+REFER.map(function(k){ return box(k,false); }).join("")+'</div>'+
+      '<button class="btn primary full" type="submit">'+esc(t("cont"))+'</button></form>';
+  } else if(f.step === "prep"){
+    h += '<div class="card"><h2>'+esc(t("prep_t"))+'</h2><ul class="plain"><li>'+esc(t("p1"))+'</li><li>'+esc(t("p2"))+'</li><li>'+esc(t("p3"))+'</li></ul><p class="notice warn small">'+esc(t("p_demo"))+'</p><button class="btn primary full" data-a="flowNext" data-v="acuity">'+esc(t("ready"))+'</button></div>';
+  } else if(f.step === "acuity"){
+    var L = LEVELS[f.lvl];
+    h += '<div class="card"><div class="row between"><h2>'+esc(f.eye==="right"?t("r_eye"):t("l_eye"))+'</h2><span class="mono muted">'+esc(t("line",{l:L.l}))+' · '+(f.trial+1)+'/3</span></div>'+
+      '<p><b>'+esc(f.eye==="right"?t("eye_r"):t("eye_l"))+'</b></p>'+
+      '<div class="chart">'+eSvg(f.dir, L.px)+'</div><p class="muted" style="text-align:center">'+esc(t("which"))+'</p>'+
+      '<div class="dirs"><span></span><button class="btn" data-a="ans" data-v="up">↑ '+esc(t("up"))+'</button><span></span>'+
+      '<button class="btn" data-a="ans" data-v="left">← '+esc(t("left"))+'</button><button class="btn" data-a="ans" data-v="none">'+esc(t("cant"))+'</button><button class="btn" data-a="ans" data-v="right">'+esc(t("right"))+' →</button>'+
+      '<span></span><button class="btn" data-a="ans" data-v="down">↓ '+esc(t("down"))+'</button><span></span></div></div>';
+  } else if(f.step === "photo"){
+    h += '<div class="card"><h2>'+esc(t("photo_t"))+'</h2><p>'+esc(t("photo_b"))+'</p>'+
+      (f.photo ? '<img class="preview" src="'+f.photo+'" alt="Eye photo preview">' : '')+
+      '<label class="btn" for="eye-photo">'+esc(t("photo_btn"))+'</label><input id="eye-photo" type="file" accept="image/*" capture="environment" hidden>'+
+      '<button class="btn primary full" data-a="finish">'+esc(t("save"))+'</button>'+(f.photo?'':'<button class="btn ghost" data-a="finish">'+esc(t("photo_skip"))+'</button>')+'</div>';
+  }
+  return h;
+}
+function answer(v){
+  var f = S.flow;
+  f.trial++; if(v === f.dir) f.ok++;
+  var fails = f.trial - f.ok, done = false, passed = false;
+  if(f.ok >= 2){ done = true; passed = true; } else if(fails >= 2){ done = true; }
+  if(done){
+    if(passed) f.best = f.lvl;
+    if(passed && f.lvl < LEVELS.length-1){ f.lvl++; f.trial = 0; f.ok = 0; }
+    else {
+      f.ac[f.eye] = f.best;
+      if(f.eye === "right"){ f.eye = "left"; f.lvl = 0; f.trial = 0; f.ok = 0; f.best = -1; }
+      else { f.step = "photo"; }
+    }
+  }
+  f.dir = rand(f.dir);
+}
+function finishFlow(){
+  var f = S.flow, pt = P(f.pid);
+  var s = {id:uid("s"), pid:f.pid, at:stamp(0), assisted:f.role==="facilitator", sym:f.sym.slice(), ac:{right:f.ac.right, left:f.ac.left}, photo:f.photo, outcome:outcomeOf(f.sym, f.ac), synced:S.online};
+  S.screenings.push(s);
+  if(S.online) afterScreen(s);
+  S.flow = null;
+  go("result", s.id);
+  if(!S.online) toast(t("saved_off"));
+}
+function afterScreen(s){
+  var pt = P(s.pid);
+  msg("f", "p:"+s.pid, smsResult(s));
+  if(s.outcome !== "pass") staff("f", (s.outcome === "urgent" ? "URGENT: " : "New referral: ")+pt.name+" ("+pt.phone+") "+(s.outcome === "urgent" ? "reported a warning sign and was told to go to hospital today. Please call them." : "needs an eye doctor. Right "+LEVELSL(s.ac.right)+", left "+LEVELSL(s.ac.left)+"."));
+}
+function afterBook(a, byFac){
+  var pt = P(a.pid), pv = PV(a.prov);
+  smsTo(a.pid, "req", {d:pv.doctor, date:fmtD(a.date), time:a.time});
+  staff("d:"+a.prov, "New request: "+pt.name+", "+pt.age+", speaks "+LN[pt.lang||"en"]+". "+(a.mode==="video"?"Video call":"Phone call")+" on "+fmtD(a.date)+" at "+a.time+"."+(a.note?" Note: "+a.note:"")+(byFac?" Booked by the facilitator.":""));
+  if(!byFac) staff("f", pt.name+" booked "+pv.doctor+" for "+fmtD(a.date)+" at "+a.time+".");
+}
+function smsResult(s){
+  var L = plang(s.pid), a = function(i){ return i < 0 ? "<6/60" : LEVELS[i].l; };
+  return sw(L, "saved", {r:a(s.ac.right), l:a(s.ac.left), x:sw(L, s.outcome, {})});
+}
+
+/* ---------- result ---------- */
+function resultView(sid){
+  var s = SC(sid); if(!s) return back(home())+'<p>Not found.</p>';
+  var o = s.outcome, h = back(home());
+  h += '<div class="verdict '+o+'"><span class="small mono">'+fmtD(s.at)+(s.assisted?" · Assisted":"")+'</span><h2>'+esc(t({urgent:"urg_t",refer:"ref_t",pass:"pass_t"}[o]))+'</h2><p>'+esc(t({urgent:"urg_b",refer:"ref_b",pass:"pass_b"}[o]))+'</p></div>';
+  if(!s.synced) h += '<div class="notice warn">'+esc(t("saved_off"))+'</div>';
+  if(o === "urgent"){
+    var hp = S.providers.filter(function(p){ return p.kind === "hosp"; })[0];
+    h += '<div class="card"><h3>'+esc(t("nearest"))+'</h3><b>'+esc(hp.name)+'</b><span class="muted">'+esc(t("km",{d:hp.km}))+' · <span class="mono">'+esc(hp.phone)+'</span></span><span class="small">'+esc(hp.services)+'</span></div>';
+  }
+  h += '<div class="card"><h3>'+esc(t("acu_t"))+'</h3><dl class="kv"><dt>'+esc(t("r_eye"))+'</dt><dd class="mono">'+esc(acuityLabel(s.ac.right))+'</dd><dt>'+esc(t("l_eye"))+'</dt><dd class="mono">'+esc(acuityLabel(s.ac.left))+'</dd></dl><p class="muted small">'+esc(t("acu_help"))+'</p></div>';
+  h += '<div class="card"><h3>'+esc(t("you_said"))+'</h3>'+(s.sym.length ? '<ul class="plain">'+s.sym.map(function(k){ return '<li>'+esc(t(k))+'</li>'; }).join("")+'</ul>' : '<p class="muted">'+esc(t("none_sym"))+'</p>')+
+    (s.photo ? '<img class="thumb" src="'+s.photo+'" alt="Eye photo">' : '')+'</div>';
+  if(o === "pass") h += '<div class="notice">'+esc(t("rem_year",{date:fmtD(addDays(s.at,365))}))+'</div><div class="row"><button class="btn primary" data-a="go" data-v="tips">'+esc(t("learn"))+'</button></div>';
+  else h += '<div class="row"><button class="btn primary" data-a="go" data-v="book" data-p="'+s.id+'">'+esc(t("book_c"))+'</button><button class="btn" data-a="go" data-v="care" data-p="'+s.id+'">'+esc(t("find"))+'</button></div>';
+  return h+reviewed();
+}
+
+/* ---------- care directory ---------- */
+function careView(){
+  var sid = S.param[S.role], tab = S.careTab;
+  var list = S.providers.filter(function(p){ return tab === "all" || p.kind === tab; }).sort(function(a,b){ return a.km - b.km; });
+  var h = back(home())+'<h1>'+esc(t("care_t"))+'</h1><div class="tabs">'+
+    [["all","all"],["clinic","clinics"],["hosp","hosp"],["pharm","pharm"]].map(function(x){ return '<button data-a="careTab" data-v="'+x[0]+'" aria-pressed="'+(tab===x[0])+'">'+esc(t(x[1]))+'</button>'; }).join("")+'</div>';
+  h += list.map(function(p){
+    return '<div class="card"><div class="row between"><h3>'+esc(p.name)+'</h3><span class="mono small muted">'+esc(p.km != null ? t("km",{d:p.km}) : p.area)+'</span></div>'+
+      (p.doctor ? '<span>'+esc(p.doctor)+' · <span class="muted">'+esc(p.role)+'</span></span>' : '')+
+      '<span class="small">'+esc(p.services)+'</span>'+
+      '<div class="row between"><span class="small"><span class="muted">'+esc(t("price"))+':</span> <b>'+esc(p.price)+'</b></span>'+(p.free?'<span class="pill ok">'+esc(t("free"))+'</span>':'')+'</div>'+
+      '<div class="row between"><span class="mono small">'+esc(p.phone)+'</span>'+(p.doctor?'<button class="btn primary" data-a="bookWith" data-id="'+p.id+'" data-s="'+(sid||"")+'">'+esc(t("book"))+'</button>':'')+'</div></div>';
+  }).join("");
+  h += '<p class="muted small">'+esc(t("sample"))+'</p>';
+  return h;
+}
+
+/* ---------- booking ---------- */
+function bookView(sid){
+  var pid = ctxPid(), pt = P(pid), pre = S.bookProv || "";
+  var docs = S.providers.filter(function(p){ return p.doctor; });
+  var h = back(home())+'<h1>'+esc(t("book_t"))+'</h1>';
+  h += '<form class="card" data-form="book"><input type="hidden" name="sid" value="'+esc(sid||"")+'">'+
+    '<label class="f" for="b-name">'+esc(t("f_name"))+'<input id="b-name" name="name" type="text" value="'+esc(pt.name)+'" required></label>'+
+    '<div class="f"><span>'+esc(t("f_gender"))+'</span><div class="opts">'+
+      '<label class="opt"><input id="b-g-f" type="radio" name="gender" value="female"'+(pt.gender==="female"?" checked":"")+'><span>'+esc(t("female"))+'</span></label>'+
+      '<label class="opt"><input id="b-g-m" type="radio" name="gender" value="male"'+(pt.gender==="male"?" checked":"")+'><span>'+esc(t("male"))+'</span></label></div></div>'+
+    '<label class="f" for="b-doc">'+esc(t("f_doc"))+'<select id="b-doc" name="prov" required><option value="">'+esc(t("pick_doc"))+'</option>'+
+      docs.map(function(p){ return '<option value="'+p.id+'"'+(pre===p.id?" selected":"")+'>'+esc(p.doctor+" · "+p.role+" · "+p.name)+'</option>'; }).join("")+'</select></label>'+
+    '<label class="f" for="b-date">'+esc(t("f_date"))+'<input id="b-date" name="date" type="date" min="'+day(0)+'" value="'+day(1)+'" required></label>'+
+    '<div class="f"><span>'+esc(t("f_time"))+'</span><div class="opts">'+SLOTS.map(function(s,i){ return '<label class="opt"><input id="b-t-'+i+'" type="radio" name="time" value="'+s+'"'+(i===1?" checked":"")+'><span class="mono">'+s+'</span></label>'; }).join("")+'</div></div>'+
+    '<div class="f"><span>'+esc(t("f_mode"))+'</span><div class="opts">'+
+      '<label class="opt"><input id="b-m-p" type="radio" name="mode" value="phone" checked><span>'+esc(t("phone"))+'</span></label>'+
+      '<label class="opt"><input id="b-m-v" type="radio" name="mode" value="video"><span>'+esc(t("video"))+'</span></label></div><span class="muted small" style="font-weight:400">'+esc(t("video_note"))+'</span></div>'+
+    '<label class="f" for="b-note">'+esc(t("f_note"))+'<textarea id="b-note" name="note"></textarea></label>'+
+    '<button class="btn primary full" type="submit">'+esc(t("book"))+'</button></form>';
+  return h;
+}
+
+/* ---------- facilitator ---------- */
+function followups(){
+  var out = [];
+  S.patients.forEach(function(p){
+    var s = screensOf(p.id)[0]; if(!s || s.outcome === "pass") return;
+    var ap = apptsOf(p.id).filter(function(a){ return a.created >= s.at || a.sid === s.id; })[0];
+    var state = !ap ? "none" : ap.status;
+    if(state === "none" || state === "missed") out.push({p:p, s:s, a:ap, state:state});
+  });
+  return out;
+}
+function facStats(){
+  var latest = S.patients.map(function(p){ return screensOf(p.id)[0]; }).filter(Boolean);
+  var need = latest.filter(function(s){ return s.outcome !== "pass"; });
+  var booked = need.filter(function(s){ return apptsOf(s.pid).some(function(a){ return a.status !== "missed"; }); });
+  var seen = need.filter(function(s){ return apptsOf(s.pid).some(function(a){ return a.status === "done"; }); });
+  return {screened:S.screenings.length, need:need.length, booked:booked.length, seen:seen.length};
+}
+function facView(){
+  if(S.flow && S.flow.role === "facilitator") return '<div class="narrow">'+flowView()+'</div>';
+  var v = S.view.facilitator, p = S.param.facilitator;
+  if(v === "result") return '<div class="narrow">'+resultView(p)+'</div>';
+  if(v === "care") return '<div class="narrow">'+careView()+'</div>';
+  if(v === "book") return '<div class="narrow">'+bookView(p)+'</div>';
+  if(v === "tips") return '<div class="narrow">'+tipsView()+'</div>';
+  if(v === "assist") return '<div class="narrow">'+assistView()+'</div>';
+  var st = facStats(), fu = followups(), pct = st.need ? Math.round(st.seen/st.need*100) : 0;
+  var h = '<div class="row between"><div><span class="muted small">Facilitator · Halima Yusuf</span><h1>'+esc(S.station)+'</h1></div><button class="btn primary" data-a="go" data-v="assist">Start assisted check</button></div>';
+  h += '<div class="stats">'+
+    '<div class="stat"><b class="mono">'+st.screened+'</b><span>Eye checks done</span></div>'+
+    '<div class="stat"><b class="mono">'+st.need+'</b><span>People who need an eye doctor</span></div>'+
+    '<div class="stat"><b class="mono">'+st.booked+'</b><span>Of those, booked</span></div>'+
+    '<div class="stat"><b class="mono">'+st.seen+'</b><span>Of those, seen by a doctor</span></div></div>';
+  h += '<div class="card"><div class="row between"><h3>Referral completion</h3><span class="mono">'+pct+'%</span></div><div class="bar"><i style="width:'+pct+'%"></i></div><p class="muted small">Share of people who needed an eye doctor and were actually seen. This is the number IDOC is built to raise.</p></div>';
+  var due = dueReminders(), up = upcomingRechecks();
+  h += '<div class="card"><div class="row between"><h3>Scheduled SMS reminders <span class="pill acc">'+due.length+' due</span></h3>'+(due.length?'<button class="btn primary" data-a="sendDue">Send '+due.length+' due reminder'+(due.length===1?"":"s")+'</button>':'')+'</div>'+
+    '<p class="muted small">Sent in each patient\'s language. In the live system they go out automatically every morning.</p><div class="list">'+
+    (due.length ? due.map(function(r){ var pt = P(r.pid); return '<div class="item"><div class="row between"><b>'+esc(pt.name)+'</b><span class="pill '+(r.key.indexOf("appt:")===0?"acc":"warn")+'">'+r.kind+'</span></div><span class="muted small">'+esc(r.detail)+' · '+LN[pt.lang||"en"]+' · <span class="mono">'+esc(pt.phone)+'</span></span></div>'; }).join("") : '<p class="muted">Nothing due today.</p>')+'</div>'+
+    (up.length ? '<p class="small"><span class="muted">Next yearly re-checks:</span> '+up.map(function(x){ return esc(x.p.name)+' ('+fmtD(x.due)+')'; }).join(", ")+'</p>' : '')+'</div>';
+  h += '<div class="grid2"><div class="card"><h3>Needs follow-up <span class="pill warn">'+fu.length+'</span></h3><div class="list">'+
+    (fu.length ? fu.map(function(x){
+      var c = S.contacted[x.p.id];
+      return '<div class="item"><div class="row between"><b>'+esc(x.p.name)+'</b>'+(x.state==="missed"?'<span class="pill danger">Missed appointment</span>':'<span class="pill warn">Not booked</span>')+'</div>'+
+        '<span class="muted small">Checked '+fmtD(x.s.at)+' · '+esc(x.p.community)+' · '+LN[x.p.lang||"en"]+' · <span class="mono">'+esc(x.p.phone)+'</span></span>'+
+        (c ? '<span class="small">Contacted '+fmtD(c)+'</span>' : '')+
+        '<div class="row"><button class="btn" data-a="remind" data-id="'+x.p.id+'">Send SMS reminder</button><button class="btn" data-a="facBook" data-id="'+x.p.id+'" data-s="'+x.s.id+'">Book for them</button><button class="btn ghost" data-a="contacted" data-id="'+x.p.id+'">Mark as called</button></div></div>';
+    }).join("") : '<p class="muted">Everyone who needs care has a booking.</p>')+'</div></div>';
+  var recent = S.screenings.slice().sort(function(a,b){ return a.at < b.at ? 1 : -1; }).slice(0,6);
+  h += '<div class="card"><h3>Recent checks</h3><div class="list">'+recent.map(function(s){
+    var pt = P(s.pid);
+    return '<div class="item"><div class="row between"><b>'+esc(pt.name)+'</b>'+outPill(s.outcome)+'</div><span class="muted small">'+fmtD(s.at)+' · R <span class="mono">'+esc(acuityLabel(s.ac.right))+'</span> · L <span class="mono">'+esc(acuityLabel(s.ac.left))+'</span>'+(s.assisted?" · Assisted":" · Own phone")+syncPill(s)+'</span><div><button class="linkbtn" data-a="facOpen" data-id="'+s.pid+'" data-s="'+s.id+'">Open result</button></div></div>';
+  }).join("")+'</div></div></div>';
+  return '<div class="wide">'+h+'</div>';
+}
+function assistView(){
+  var h = back("dash")+'<h1>Assisted check</h1><div class="card"><h3>Returning patient</h3><p class="muted small">Their earlier records load so you continue where they stopped.</p><div class="list">'+
+    S.patients.map(function(p){ var n = screensOf(p.id).length; return '<div class="item"><div class="row between"><span><b>'+esc(p.name)+'</b> <span class="muted small">'+esc(p.age)+' · '+esc(p.community)+' · '+LN[p.lang||"en"]+' · '+n+' check'+(n===1?"":"s")+'</span></span><button class="btn" data-a="facPick" data-id="'+p.id+'">Start check</button></div></div>'; }).join("")+'</div></div>';
+  h += '<form class="card" data-form="facReg"><h3>New patient</h3>'+regFields("fr")+'<label class="check" for="fr-consent"><input id="fr-consent" type="checkbox" name="consent" required><span>The patient agreed to have their details and results saved.</span></label><button class="btn primary full" type="submit">Register and start check</button></form>';
+  return h;
+}
+
+/* ---------- doctor ---------- */
+function docView(){
+  var me = PV(S.docProv), docs = S.providers.filter(function(p){ return p.doctor; });
+  var mine = S.appts.filter(function(a){ return a.prov === me.id && a.synced; });
+  var groups = [["requested","New requests"],["confirmed","Upcoming"],["done","Completed"],["missed","Missed"]];
+  var h = '<div class="row between"><div><span class="muted small">Signed in as</span><h1>'+esc(me.doctor)+'</h1><span class="muted">'+esc(me.role)+' · '+esc(me.name)+'</span></div>'+
+    '<label class="f" for="doc-sel" style="min-width:240px">Switch doctor<select id="doc-sel" data-change="docSel">'+docs.map(function(p){ return '<option value="'+p.id+'"'+(p.id===me.id?" selected":"")+'>'+esc(p.doctor)+'</option>'; }).join("")+'</select></label></div>';
+  var waiting = S.appts.filter(function(a){ return a.prov === me.id && !a.synced; }).length;
+  if(waiting) h += '<div class="notice warn">'+waiting+' booking'+(waiting===1?" is":"s are")+' saved on a device without network. It will appear here once it syncs.</div>';
+  var open = S.param.doctor;
+  groups.forEach(function(g){
+    var list = mine.filter(function(a){ return a.status === g[0]; }).sort(function(a,b){ return (a.date+a.time) < (b.date+b.time) ? -1 : 1; });
+    if(!list.length && (g[0]==="done"||g[0]==="missed")) return;
+    h += '<div class="card"><h3>'+g[1]+' <span class="pill">'+list.length+'</span></h3><div class="list">'+(list.length ? list.map(function(a){ return docAppt(a, open === a.id); }).join("") : '<p class="muted">Nothing here.</p>')+'</div></div>';
+  });
+  return '<div class="wide">'+h+'</div>';
+}
+function docAppt(a, isOpen){
+  var pt = P(a.pid), s = SC(a.sid);
+  var h = '<div class="item"><div class="row between"><b>'+esc(pt.name)+' <span class="muted small" style="font-weight:400">'+esc(pt.age)+' · '+esc(pt.gender)+' · '+esc(pt.community)+' · speaks '+LN[pt.lang||"en"]+'</span></b>'+(s?outPill(s.outcome):'')+'</div>'+
+    '<span class="small">'+fmtD(a.date)+' · <span class="mono">'+esc(a.time)+'</span> · '+(a.mode==="video"?"Video call":"Phone call")+' · <span class="mono">'+esc(pt.phone)+'</span></span>'+
+    (a.note ? '<span class="small muted">“'+esc(a.note)+'”</span>' : '');
+  if(isOpen){
+    if(s) h += '<div class="card" style="background:var(--bg)"><dl class="kv"><dt>Screened</dt><dd>'+fmtD(s.at)+(s.assisted?" (assisted)":"")+'</dd><dt>Right eye</dt><dd class="mono">'+esc(LEVELSL(s.ac.right))+'</dd><dt>Left eye</dt><dd class="mono">'+esc(LEVELSL(s.ac.left))+'</dd><dt>Reported</dt><dd>'+(s.sym.length?esc(s.sym.map(function(k){ return W.en[k]; }).join("; ")):"Nothing reported")+'</dd></dl>'+
+      (s.photo ? '<img class="preview" src="'+s.photo+'" alt="Patient eye photo">' : '<span class="muted small">No eye photo taken.</span>')+
+      '<span class="muted small">Past checks: '+screensOf(pt.id).length+'</span></div>';
+    if(a.status === "requested") h += '<div class="row"><button class="btn primary" data-a="docConfirm" data-id="'+a.id+'">Confirm '+(a.mode==="video"?"video call":"phone call")+'</button><button class="btn" data-a="docOpen" data-id="">Close</button></div>';
+    if(a.status === "confirmed") h += '<form class="stack" data-form="docDone"><input type="hidden" name="id" value="'+a.id+'">'+
+      '<label class="f" for="dd-out">Outcome<select id="dd-out" name="outcome"><option>Advice given, no visit needed</option><option>Needs glasses, visit clinic</option><option>Needs in-person eye exam</option><option>Refer to hospital eye unit</option></select></label>'+
+      '<label class="f" for="dd-note">Note for the patient (they see this)<textarea id="dd-note" name="note" required placeholder="What you told the patient and the next step"></textarea></label>'+
+      '<div class="row"><button class="btn primary" type="submit">Complete consultation</button><button class="btn" type="button" data-a="docMissed" data-id="'+a.id+'">Patient did not answer</button></div></form>';
+    if(a.docNote) h += '<div class="notice"><b>'+esc(a.outcome)+':</b> '+esc(a.docNote)+'</div>';
+  } else {
+    h += '<div><button class="linkbtn" data-a="docOpen" data-id="'+a.id+'">'+(a.status==="requested"?"Review request":a.status==="confirmed"?"Open consultation":"View")+'</button></div>';
+  }
+  return h+'</div>';
+}
+function LEVELSL(i){ return i < 0 ? "worse than 6/60" : LEVELS[i].l; }
+
+/* ---------- overlays ---------- */
+var QUICK = {
+  en:["OK, thank you","Please call me","I can't make that time"],
+  pcm:["OK, thank you","Abeg call me","I no go fit that time"],
+  ha:["To, na gode","Don Allah ka kira ni","Ba zan samu wannan lokacin ba"],
+  doctor:["I will call you shortly","Please come to the clinic this week","Can we move it to tomorrow, same time?"],
+  facilitator:["I will call you today","Please come to the station","Your doctor will call you soon"]
+};
+function sendReply(text){
+  var me = meParty(), o = S.inbox.thread; if(!me || !o || o === "s") return;
+  msg(me, o, text); toast("Sent to "+partyName(o)); render();
+}
+function smsPanel(){
+  if(!S.inbox.open) return "";
+  var me = meParty(), h = '<aside class="drawer phone" aria-label="Messages">';
+  if(!me) return h+'<p class="muted">Sign in as a patient to see messages.</p></aside>';
+  var who = S.role === "patient" ? P(S.patientId).name+" · "+P(S.patientId).phone : partyName(me)+" · "+partyPhone(me);
+  if(!S.inbox.thread){
+    var th = threadsFor(me);
+    h += '<div class="row between"><h3>'+esc(t("sms"))+'</h3><button class="btn ghost" data-a="inbox">'+esc(t("close"))+'</button></div><span class="muted small mono">'+esc(who)+'</span>';
+    h += th.length ? th.map(function(x){
+      return '<button class="thread" data-a="thread" data-v="'+x.other+'"><span class="row between"><b>'+esc(partyName(x.other))+'</b><span class="mono small muted">'+fmtD(x.last.at)+'</span></span><span class="small muted clip">'+(x.last.from===me?"You: ":"")+esc(x.last.text)+'</span>'+(x.unread?'<span class="badge">'+x.unread+' new</span>':'')+'</button>';
+    }).join("") : '<p class="muted">No messages yet.</p>';
+    h += '<p class="muted small">'+esc(t("sms_note"))+'</p>';
+    return h+'</aside>';
+  }
+  var o = S.inbox.thread, list = threadsFor(me).filter(function(x){ return x.other === o; })[0];
+  var msgs = list ? list.msgs : [];
+  msgs.forEach(function(m){ if(m.to === me) m.read = true; });
+  h += '<div class="row between"><button class="btn ghost" data-a="thread" data-v="">← '+esc(t("back"))+'</button><button class="btn ghost" data-a="inbox">'+esc(t("close"))+'</button></div>'+
+    '<div><b>'+esc(partyName(o))+'</b><div class="mono small muted">'+esc(partyPhone(o))+'</div></div><div class="bubbles">'+
+    msgs.map(function(m){ return '<div class="bubble'+(m.from===me?" mine":"")+'"><span>'+esc(m.text)+'</span><span class="mono">'+fmtD(m.at)+' '+fmtT(m.at)+'</span></div>'; }).join("")+'</div>';
+  if(o === "s") h += '<p class="muted small">Automatic alerts. Replies are not sent.</p>';
+  else {
+    var q = S.role === "patient" ? QUICK[S.lang] || QUICK.en : QUICK[S.role];
+    h += '<div class="opts">'+q.map(function(x){ return '<button class="btn small-btn" data-a="quick" data-v="'+esc(x)+'">'+esc(x)+'</button>'; }).join("")+'</div>'+
+      '<form class="row" data-form="reply" style="flex-wrap:nowrap"><label for="reply-text" class="sr">Reply</label><input id="reply-text" name="text" type="text" placeholder="'+esc(t("reply_ph"))+'" autocomplete="off" style="flex:1"><button class="btn primary" type="submit">'+esc(t("send"))+'</button></form>';
+  }
+  return h+'</aside>';
+}
+function modal(){
+  if(!S.modal) return "";
+  return '<div class="scrim"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-t"><div style="color:var(--accent);display:flex;justify-content:center">'+EYE_BIG+'</div><h2 id="m-t">'+esc(t(S.modal.t))+'</h2><p>'+esc(t(S.modal.b))+'</p>'+(S.modal.b2?'<p class="muted small">'+esc(t(S.modal.b2))+'</p>':'')+'<button class="btn primary full" data-a="closeModal">'+esc(t("ok"))+'</button></div></div>';
+}
+
+/* ---------- render ---------- */
+function render(){
+  document.documentElement.lang = S.lang === "ha" ? "ha" : S.lang === "pcm" ? "pcm" : "en";
+  var m = S.role === "patient" ? patientView() : S.role === "facilitator" ? facView() : docView();
+  document.getElementById("app").innerHTML = header()+'<main>'+m+'</main>'+smsPanel()+modal()+(toastMsg?'<div class="toast" role="status">'+esc(toastMsg)+'</div>':'');
+  save();
+}
+
+/* ---------- actions ---------- */
+function act(a, d){
+  switch(a){
+    case "role": S.role = d.v; S.flow = null; S.inbox.thread = null; window.scrollTo(0,0); break;
+    case "lang": S.lang = d.v; break;
+    case "net":
+      S.online = !S.online;
+      if(S.online){
+        var n = 0;
+        S.screenings.forEach(function(s){ if(!s.synced){ s.synced = true; n++; afterScreen(s); } });
+        S.appts.forEach(function(x){ if(!x.synced){ x.synced = true; n++; afterBook(x, x.byFac); } });
+        toast(n ? n+" saved item"+(n===1?"":"s")+" uploaded" : "Back online");
+      } else toast("Offline. New checks will be saved on this device.");
+      break;
+    case "inbox": S.inbox.open = !S.inbox.open; S.inbox.thread = null; break;
+    case "thread": S.inbox.thread = d.v || null; break;
+    case "quick": sendReply(d.v); break;
+    case "reset": S = seed(); toastMsg = null; break;
+    case "authTab": S.param.patient = d.v; break;
+    case "asPatient": S.patientId = d.id; S.lang = P(d.id).lang || S.lang; go("home"); break;
+    case "signout": S.patientId = null; go("home"); break;
+    case "go": go(d.v, d.p); if(d.v === "care") S.careTab = "all"; if(d.v === "book") S.bookProv = ""; window.scrollTo(0,0); break;
+    case "readAll": S.notifs.forEach(function(n){ if(n.pid === S.patientId) n.read = true; }); break;
+    case "startCheck": startFlow(S.patientId); window.scrollTo(0,0); break;
+    case "cancelFlow":
+      var f = S.flow, i = STEPS.indexOf(f.step);
+      if(i <= 0) S.flow = null; else if(f.step === "acuity") { f.step = "prep"; f.eye = "right"; f.lvl = 0; f.trial = 0; f.ok = 0; f.best = -1; f.ac = {}; } else f.step = STEPS[i-1];
+      break;
+    case "flowNext": S.flow.step = d.v; window.scrollTo(0,0); break;
+    case "ans": answer(d.v); break;
+    case "finish": finishFlow(); window.scrollTo(0,0); break;
+    case "careTab": S.careTab = d.v; break;
+    case "bookWith": S.bookProv = d.id; S.view[S.role] = "book"; S.param[S.role] = d.s || (screensOf(ctxPid())[0]||{}).id || null; window.scrollTo(0,0); break;
+    case "closeModal": S.modal = null; go(home()); break;
+    case "facPick": S.facPatientId = d.id; S.lang = P(d.id).lang || S.lang; startFlow(d.id); window.scrollTo(0,0); break;
+    case "facOpen": S.facPatientId = d.id; go("result", d.s); window.scrollTo(0,0); break;
+    case "facBook": S.facPatientId = d.id; S.bookProv = ""; go("book", d.s); window.scrollTo(0,0); break;
+    case "remind":
+      var pt = P(d.id); smsTo(pt.id, "remind", {n:pt.name.split(" ")[0], s:S.station});
+      S.contacted[d.id] = stamp(0); toast("Reminder sent to "+pt.name+"'s messages"); break;
+    case "sendDue": var nd = sendDue(); toast(nd+" reminder"+(nd===1?"":"s")+" sent"); break;
+    case "contacted": S.contacted[d.id] = stamp(0); toast("Marked as called"); break;
+    case "docOpen": S.param.doctor = d.id || null; break;
+    case "docConfirm":
+      var ap = S.appts.filter(function(x){ return x.id === d.id; })[0], pv = PV(ap.prov), p2 = P(ap.pid);
+      ap.status = "confirmed";
+      var L2 = plang(p2.id), msg = sw(L2, "conf", {d:pv.doctor, m:W[L2][ap.mode].toLowerCase(), date:fmtD(ap.date), time:ap.time});
+      notify(p2.id, msg); smsTo(p2.id, "ready", {d:pv.doctor, date:fmtD(ap.date), time:ap.time}, "d:"+pv.id);
+      staff("f", pv.doctor+" confirmed "+p2.name+" for "+fmtD(ap.date)+" at "+ap.time+".");
+      toast("Confirmed. Patient and facilitator notified."); break;
+    case "docMissed":
+      var am = S.appts.filter(function(x){ return x.id === d.id; })[0], pm = P(am.pid), vm = PV(am.prov); am.status = "missed"; S.param.doctor = null;
+      smsTo(pm.id, "missed", {d:vm.doctor}, "d:"+vm.id);
+      staff("f", pm.name+" missed the "+(am.mode==="video"?"video":"phone")+" call with "+vm.doctor+" on "+fmtD(am.date)+". Please follow up.");
+      toast("Marked as missed. Patient and facilitator notified."); break;
+  }
+  render();
+}
+function formAct(name, f){
+  var fd = new FormData(f), o = {}; fd.forEach(function(v,k){ o[k] = v; });
+  if(name === "register" || name === "facReg"){
+    var p = {id:uid("p"), name:o.name.trim(), phone:o.phone.replace(/\s/g,""), gender:o.gender, age:+o.age, community:o.community.trim(), lang:o.lang || S.lang};
+    S.patients.push(p);
+    if(name === "register"){ S.patientId = p.id; S.lang = p.lang; go("home"); }
+    else { S.facPatientId = p.id; S.lang = p.lang; startFlow(p.id); }
+  } else if(name === "signin"){
+    var ph = o.phone.replace(/\s/g,""), m = S.patients.filter(function(x){ return x.phone === ph; })[0];
+    if(!m){ toast(t("no_acct")); } else { S.patientId = m.id; S.lang = m.lang || S.lang; go("home"); }
+  } else if(name === "symptoms"){
+    S.flow.sym = fd.getAll("sym"); S.flow.step = "prep"; window.scrollTo(0,0);
+  } else if(name === "book"){
+    if(!o.prov){ toast(t("pick_doc")); render(); return; }
+    if(!o.date || !o.time){ toast(t("need_dt")); render(); return; }
+    var pid = ctxPid(), pt = P(pid);
+    pt.name = o.name.trim() || pt.name; if(o.gender) pt.gender = o.gender;
+    var a = {id:uid("a"), pid:pid, sid:o.sid || ((screensOf(pid)[0]||{}).id || null), prov:o.prov, date:o.date, time:o.time, mode:o.mode, note:(o.note||"").trim(), status:"requested", synced:S.online, created:stamp(0)};
+    S.appts.push(a);
+    a.byFac = S.role === "facilitator";
+    if(S.online) afterBook(a, a.byFac);
+    S.modal = {t:"booked_t", b:"booked_b", b2:"rem_day"};
+  } else if(name === "reply"){
+    if((o.text||"").trim()) sendReply(o.text.trim());
+    return;
+  } else if(name === "docDone"){
+    var ap = S.appts.filter(function(x){ return x.id === o.id; })[0];
+    ap.status = "done"; ap.outcome = o.outcome; ap.docNote = o.note.trim();
+    notify(ap.pid, PV(ap.prov).doctor+": "+ap.outcome+". "+ap.docNote);
+    smsTo(ap.pid, "note", {d:PV(ap.prov).doctor, n:ap.docNote}, "d:"+ap.prov);
+    staff("f", PV(ap.prov).doctor+" completed the consultation with "+P(ap.pid).name+": "+ap.outcome+".");
+    S.param.doctor = null; toast("Consultation completed. Patient and facilitator notified.");
+  }
+  render();
+}
+
+document.addEventListener("click", function(e){
+  /* forms are handled here, not by "submit": the hosting frame can block form submission */
+  var sb = e.target.closest('button[type="submit"]'), sf = sb && sb.closest("form[data-form]");
+  if(sf){
+    e.preventDefault();
+    if(sf.checkValidity && !sf.checkValidity()){ if(sf.reportValidity) sf.reportValidity(); return; }
+    formAct(sf.getAttribute("data-form"), sf); return;
+  }
+  var b = e.target.closest("[data-a]"); if(!b) return;
+  e.preventDefault(); act(b.getAttribute("data-a"), b.dataset);
+});
+document.addEventListener("keydown", function(e){
+  if(e.key !== "Enter" || e.target.tagName !== "INPUT") return;
+  var f = e.target.closest("form[data-form]"), btn = f && f.querySelector('button[type="submit"]');
+  if(btn){ e.preventDefault(); btn.click(); }
+});
+document.addEventListener("submit", function(e){
+  var f = e.target.closest("form[data-form]"); if(!f) return;
+  e.preventDefault(); formAct(f.getAttribute("data-form"), f);
+});
+document.addEventListener("change", function(e){
+  if(e.target.id === "eye-photo" && e.target.files && e.target.files[0]){
+    shrink(e.target.files[0], function(url){ S.flow.photo = url; render(); });
+  } else if(e.target.getAttribute("data-change") === "docSel"){
+    S.docProv = e.target.value; S.param.doctor = null; render();
+  }
+});
+function shrink(file, cb){
+  var r = new FileReader();
+  r.onload = function(){ var img = new Image(); img.onload = function(){
+    var m = 560, s = Math.min(1, m/Math.max(img.width, img.height)), c = document.createElement("canvas");
+    c.width = Math.round(img.width*s); c.height = Math.round(img.height*s); c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    cb(c.toDataURL("image/jpeg",0.8)); }; img.src = r.result; };
+  r.readAsDataURL(file);
+}
+render();
+})();
+</script>
+</body>
+</html>
